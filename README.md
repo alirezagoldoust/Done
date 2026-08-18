@@ -1,4 +1,4 @@
-# Flow — Board-Centric Task Manager
+# Done. ✅ — Board-Centric Task Manager
 
 A fast, polished task manager built around a **status × category board**. Each
 board renders workflow statuses as rows (TODO, DOING, DONE) and task categories
