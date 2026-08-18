@@ -1,0 +1,200 @@
+@import "tailwindcss";
+
+/*
+  Design system — deep blue-black base with floating violet/amber gradient
+  blobs, translucent glass surfaces, a violet accent and soft glows.
+  Colours are exposed as Tailwind theme tokens via @theme so utilities like
+  bg-surface / text-muted / border-line work throughout the app.
+*/
+
+@theme {
+  --color-bg: #0a0d16;
+  --color-bg-elevated: #121626;
+  --color-surface: rgba(255, 255, 255, 0.04);
+  --color-surface-hover: rgba(255, 255, 255, 0.065);
+  --color-surface-solid: #141827;
+  --color-line: rgba(255, 255, 255, 0.09);
+  --color-line-strong: rgba(139, 123, 255, 0.4);
+
+  --color-text: #eef0f7;
+  --color-text-muted: #8b90a8;
+  --color-text-faint: #565c76;
+
+  --color-accent: #8b7bff;
+  --color-accent-hover: #9d90ff;
+  --color-accent-soft: rgba(139, 123, 255, 0.16);
+
+  --color-success: #5eead4;
+  --color-warning: #ffb454;
+  --color-danger: #ff6b6b;
+  --color-danger-soft: rgba(255, 107, 107, 0.13);
+
+  --font-sans: var(--font-vazir), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+/* Floating gradient blobs behind everything. */
+.bg-blobs {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.bg-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.5;
+}
+.bg-blob-1 {
+  width: 520px;
+  height: 520px;
+  top: -180px;
+  right: -140px;
+  background: radial-gradient(
+    circle,
+    rgba(139, 123, 255, 0.38),
+    transparent 70%
+  );
+  animation: blob-float-1 22s ease-in-out infinite;
+}
+.bg-blob-2 {
+  width: 460px;
+  height: 460px;
+  bottom: -180px;
+  left: -160px;
+  background: radial-gradient(
+    circle,
+    rgba(255, 180, 84, 0.22),
+    transparent 70%
+  );
+  animation: blob-float-2 26s ease-in-out infinite;
+}
+.bg-blob-3 {
+  width: 400px;
+  height: 400px;
+  top: 40%;
+  left: 55%;
+  background: radial-gradient(
+    circle,
+    rgba(94, 234, 212, 0.14),
+    transparent 70%
+  );
+  animation: blob-float-1 30s ease-in-out infinite reverse;
+}
+
+@keyframes blob-float-1 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-34px, 46px) scale(1.12);
+  }
+}
+@keyframes blob-float-2 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(34px, -32px) scale(1.09);
+  }
+}
+
+/* App content sits above the blobs. */
+.app-root {
+  position: relative;
+  z-index: 1;
+}
+
+/* Version-proof violet gradient (avoids Tailwind v4 gradient-utility naming). */
+.gradient-violet {
+  background-image: linear-gradient(135deg, var(--color-accent), #6a5cf0);
+}
+
+/* Thin, unobtrusive scrollbars that suit the dark surfaces. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+  background-clip: padding-box;
+}
+
+/* Visible, consistent focus rings for keyboard users. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* Centering is handled by a flex wrapper, so the pop only animates
+   opacity + scale — no translate, so no top-left positioning flash. */
+@keyframes dialog-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bg-blob {
+    animation: none !important;
+  }
+}

@@ -1,0 +1,2088 @@
+Yes. I’d structure this as a **board-centric task manager** rather than a generic CRUD app: visually closer to a polished Trello/Jira hybrid, but with a much simpler mental model.
+
+The key conceptual model I recommend is:
+
+* **Board** → belongs to many users through `BoardMember`
+* **Column** → task category, e.g. Backend, Frontend, Finance
+* **Row/Status** → workflow state, e.g. TODO, DOING, DONE
+* **Task** → belongs to exactly one board + column + status
+* **Task ordering** → explicit `position` within each column/status cell
+* A cell can contain **N tasks**
+* Dragging a task can change either its **position** or its **column/status**
+* Board membership is controlled through **Django Admin**
+* Users can only access boards where they are members
+
+### One terminology change I'd strongly recommend
+
+Your description says:
+
+> rows are progress status and columns are task categories
+
+That's perfectly fine visually, but in the database I'd call them:
+
+```text
+Board
+ ├── BoardColumn      # Backend, Frontend, Finance
+ ├── BoardStatus      # TODO, DOING, DONE
+ └── Task
+```
+
+Then the UI renders:
+
+```text
+                 BACKEND        FRONTEND       FINANCE
+              ┌────────────┐ ┌────────────┐ ┌────────────┐
+TODO          │ Task       │ │ Task       │ │ Task       │
+              │ Task       │ │            │ │ Task       │
+              └────────────┘ └────────────┘ └────────────┘
+
+DOING         │ Task       │ │ Task       │ │            │
+              │ Task       │ │ Task       │ │            │
+
+DONE          │ Task       │ │            │ │ Task       │
+```
+
+This makes the data model much cleaner.
+
+### UX I'd aim for
+
+The board should feel extremely fast:
+
+* Dark charcoal background
+* Slightly translucent/glass board cells
+* Subtle borders rather than heavy cards
+* Small status/category accents
+* No excessive gradients
+* Tasks are compact
+* Title is dominant
+* Deadline and assignee are secondary metadata
+* `+ Add task` appears directly inside the TODO cell
+* Clicking a task opens a centered modal/drawer
+* Editing should feel inline rather than like navigating to another page
+* Dragging should have a very obvious but subtle visual state
+* Board header contains:
+
+  * board name
+  * member avatars
+  * "My tasks" filter
+  * search
+  * perhaps a board settings menu for future expansion
+
+For the task preview, I'd use something like:
+
+```text
+Implement authentication
+Tomorrow · AG
+```
+
+rather than showing unnecessary information.
+
+For tasks without a deadline, don't show an empty "Deadline" label.
+
+For tasks without a doer, simply omit the assignee metadata.
+
+---
+
+## Recommended architecture
+
+Since you're already comfortable with Django/DRF and Next.js, I'd use:
+
+**Frontend**
+
+* Next.js
+* TypeScript
+* App Router
+* Tailwind CSS
+* shadcn/ui
+* dnd-kit for drag/drop
+* TanStack Query for server state
+* React Hook Form + Zod for task editing/validation
+* Lucide icons
+
+**Backend**
+
+* Django
+* Django REST Framework
+* PostgreSQL
+* Django Admin
+* Token/session authentication depending on your existing auth architecture
+
+I'd keep **ordering entirely backend-persisted**. Don't rely on array indexes in React.
+
+A task could have:
+
+```text
+id
+board
+column
+status
+title
+description
+doer
+deadline
+position
+created_at
+updated_at
+```
+
+The important part is `position`.
+
+For example:
+
+```text
+TODO / Backend
+
+Task A → position 1000
+Task B → position 2000
+Task C → position 3000
+```
+
+When moving B above A:
+
+```text
+Task B → position 500
+Task A → position 1000
+Task C → position 3000
+```
+
+You can later optimize/rebalance positions when necessary.
+
+---
+
+## Important permission rule
+
+Don't rely on the frontend to protect boards.
+
+The backend must enforce:
+
+```text
+User
+   ↓
+BoardMember
+   ↓
+Board
+```
+
+Every board API endpoint should verify that the authenticated user is a member of that board.
+
+Likewise, task creation/update/movement must verify board membership.
+
+Django Admin is responsible for adding/removing members.
+
+---
+
+## Claude Code prompt
+
+Here is the prompt I'd give Claude Code. It is deliberately detailed so it can act as an implementation specification rather than merely generating a prototype.
+
+# Build a Production-Quality Task Management Web App
+
+You are a senior full-stack engineer and product designer. Build a polished, production-quality task management web application with a **Next.js frontend** and **Django + Django REST Framework backend**.
+
+The application should feel like a refined combination of the best ideas from tools such as Trello, Jira, Linear, and modern SaaS task managers, while being significantly simpler and faster to use.
+
+Do not build a generic CRUD dashboard. Build a highly polished board-centric task management experience.
+
+---
+
+# 1. Core Product Concept
+
+The application contains:
+
+* Users
+* Boards
+* Board members
+* Board columns
+* Board statuses
+* Tasks
+
+A user can access a board only if they are a member of that board.
+
+Board membership is managed exclusively through Django Admin for now.
+
+Each board contains:
+
+* Multiple columns representing task categories
+* Multiple statuses representing task progress
+
+Example:
+
+Columns:
+
+* Backend
+* Frontend
+* Financial
+* Infrastructure
+
+Statuses:
+
+* TODO
+* DOING
+* DONE
+
+The board visually displays statuses as rows and columns as categories.
+
+Example:
+
+```
+                BACKEND       FRONTEND      FINANCIAL
+```
+
+TODO                tasks         tasks         tasks
+
+DOING               tasks         tasks         tasks
+
+DONE                tasks         tasks         tasks
+
+Each intersection of a status and column is a task cell.
+
+A cell can contain multiple tasks.
+
+Tasks can be dragged and dropped:
+
+1. Within the same cell to change priority/order
+2. Between cells to change their status and/or category
+
+---
+
+# 2. Technology Stack
+
+## Frontend
+
+Use:
+
+* Next.js
+* App Router
+* TypeScript
+* Tailwind CSS
+* shadcn/ui
+* Lucide icons
+* dnd-kit for drag and drop
+* TanStack Query for server state
+* React Hook Form
+* Zod
+
+Use strict TypeScript.
+
+Avoid unnecessary client-side state duplication of server data.
+
+Use TanStack Query as the source of truth for server state.
+
+## Backend
+
+Use:
+
+* Django
+* Django REST Framework
+* PostgreSQL
+* Django Admin
+
+Design the backend as a clean REST API.
+
+Use Django ORM properly.
+
+Use serializers, permissions, viewsets/services where appropriate.
+
+Do not put complex business logic directly into React components.
+
+---
+
+# 3. Project Architecture
+
+If the repository already contains a frontend or backend, inspect the existing project first.
+
+Do NOT blindly overwrite existing code.
+
+First:
+
+1. Inspect the repository.
+2. Identify existing applications and conventions.
+3. Identify existing authentication.
+4. Identify existing environment variables.
+5. Identify existing Docker configuration.
+6. Identify existing database configuration.
+7. Reuse existing architecture where reasonable.
+8. Only then begin implementation.
+
+If the project is empty, create a clean structure.
+
+Suggested structure:
+
+```text
+project/
+├── backend/
+│   ├── manage.py
+│   ├── config/
+│   ├── users/
+│   ├── boards/
+│   └── tasks/
+│
+├── frontend/
+│   ├── app/
+│   ├── components/
+│   ├── hooks/
+│   ├── lib/
+│   ├── types/
+│   └── ...
+│
+├── docker-compose.yml
+└── README.md
+```
+
+Adapt this structure if the existing repository has a better established architecture.
+
+---
+
+# 4. Data Model
+
+Implement the following conceptual models.
+
+## User
+
+Use Django's authentication system.
+
+Do not create a second independent user system if Django authentication already exists.
+
+Users should have:
+
+* id
+* username
+* email if available
+* first name if available
+* last name if available
+* avatar support if practical
+
+The UI must be able to display a short user identifier.
+
+For example:
+
+```text
+AG
+```
+
+for a user named Alireza Goldoust.
+
+Create a reusable helper for generating short user initials.
+
+---
+
+# 5. Board
+
+Create a Board model.
+
+Suggested fields:
+
+```text
+id
+name
+description
+created_at
+updated_at
+```
+
+A Board has many members.
+
+Do NOT use a simple unrestricted ManyToManyField if a through model is more appropriate.
+
+Create:
+
+```text
+BoardMember
+```
+
+with:
+
+```text
+board
+user
+created_at
+```
+
+Add a unique constraint:
+
+```text
+unique(board, user)
+```
+
+Board membership is managed through Django Admin.
+
+---
+
+# 6. BoardColumn
+
+Create a board-specific column/category model.
+
+Example:
+
+```text
+Backend
+Frontend
+Financial
+Infrastructure
+```
+
+Suggested fields:
+
+```text
+id
+board
+name
+position
+created_at
+updated_at
+```
+
+Each board has its own columns.
+
+Columns should have an explicit ordering field.
+
+Use a suitable ordering strategy.
+
+Do not hardcode categories.
+
+---
+
+# 7. BoardStatus
+
+Create a board-specific status model.
+
+Suggested fields:
+
+```text
+id
+board
+name
+position
+created_at
+updated_at
+```
+
+Default statuses for a new board should be:
+
+```text
+TODO
+DOING
+DONE
+```
+
+However, statuses must be configurable per board.
+
+One board may have:
+
+```text
+TODO
+DOING
+DONE
+```
+
+while another could have:
+
+```text
+BACKLOG
+IN PROGRESS
+CODE REVIEW
+TESTING
+DEPLOYED
+```
+
+Do not hardcode the three default statuses into task logic.
+
+The first status of a newly created board should be the default location for new tasks.
+
+---
+
+# 8. Task
+
+Create a Task model.
+
+Suggested fields:
+
+```text
+id
+board
+column
+status
+title
+description
+doer
+deadline
+position
+created_at
+updated_at
+```
+
+Rules:
+
+* title is required
+* description is optional
+* doer is optional
+* deadline is optional
+* board is required
+* column is required
+* status is required
+* position is required
+
+A task belongs to exactly one board.
+
+A task belongs to exactly one BoardColumn.
+
+A task belongs to exactly one BoardStatus.
+
+The selected column and status must belong to the same board as the task.
+
+The doer must be a member of the task's board.
+
+Enforce important integrity constraints at the backend level.
+
+---
+
+# 9. Task Ordering
+
+This is an important part of the application.
+
+Tasks in each status/column cell must have a deterministic priority order.
+
+Do not depend on frontend array indexes.
+
+Use an explicit numeric `position` field.
+
+A reasonable initial strategy is:
+
+```text
+1000
+2000
+3000
+4000
+...
+```
+
+When a task is moved between two tasks, calculate an appropriate position between them.
+
+Example:
+
+```text
+1000
+2000
+3000
+```
+
+Moving a task between 1000 and 2000 gives approximately:
+
+```text
+1500
+```
+
+Periodically rebalance positions when necessary.
+
+The backend must be responsible for validating and persisting ordering.
+
+---
+
+# 10. API
+
+Create a clean REST API.
+
+Suggested endpoints:
+
+```text
+GET    /api/boards/
+GET    /api/boards/:id/
+GET    /api/boards/:id/members/
+GET    /api/boards/:id/columns/
+GET    /api/boards/:id/statuses/
+GET    /api/boards/:id/tasks/
+
+POST   /api/boards/:id/tasks/
+
+PATCH  /api/tasks/:id/
+DELETE /api/tasks/:id/
+
+POST   /api/tasks/:id/move/
+```
+
+The exact URL structure can be adjusted to fit the existing backend conventions.
+
+The board detail endpoint should make it possible for the frontend to efficiently construct the entire board.
+
+Avoid N+1 queries.
+
+Use:
+
+* select_related
+* prefetch_related
+* appropriate indexes
+
+where appropriate.
+
+---
+
+# 11. Task Move API
+
+Create a dedicated task movement endpoint.
+
+For example:
+
+```text
+POST /api/tasks/:id/move/
+```
+
+Payload:
+
+```json
+{
+  "column_id": 3,
+  "status_id": 1,
+  "before_task_id": 27,
+  "after_task_id": 31
+}
+```
+
+Alternatively, design an equivalent clean API if you have a better approach.
+
+The backend must:
+
+1. Authenticate the user.
+2. Verify board membership.
+3. Verify the destination column belongs to the same board.
+4. Verify the destination status belongs to the same board.
+5. Calculate the new position.
+6. Persist the move atomically.
+7. Return the updated task.
+
+Use a database transaction for move operations.
+
+---
+
+# 12. Permissions
+
+This is critical.
+
+Never trust frontend permissions.
+
+A user can only:
+
+* view boards they belong to
+* view tasks belonging to those boards
+* create tasks in boards they belong to
+* edit tasks in boards they belong to
+* move tasks in boards they belong to
+
+A user must NOT be able to manipulate another board by modifying IDs in API requests.
+
+For assigning a task's `doer`, only users who are members of that board can be selected.
+
+Implement proper DRF permission classes.
+
+---
+
+# 13. Django Admin
+
+Django Admin is currently the primary board administration interface.
+
+Make Django Admin polished and practical.
+
+Admins should be able to manage:
+
+* Users
+* Boards
+* Board members
+* Board columns
+* Board statuses
+* Tasks
+
+For Board Admin:
+
+* show name
+* member count
+* created date
+* updated date
+
+For BoardMember:
+
+* board
+* user
+* created date
+
+For BoardColumn:
+
+* board
+* name
+* position
+
+For BoardStatus:
+
+* board
+* name
+* position
+
+For Task:
+
+* board
+* title
+* status
+* column
+* doer
+* deadline
+* created date
+* updated date
+
+Add useful list filters and search fields.
+
+Prevent selecting a doer who is not a member of the selected board if practical through admin validation/queryset customization.
+
+---
+
+# 14. Board UI
+
+The main application screen is the board.
+
+The visual hierarchy should be:
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ Board Name        Members        Search     My Tasks       │
+├─────────────┬──────────────┬──────────────┬───────────────┤
+│             │   Backend    │   Frontend   │   Financial   │
+├─────────────┼──────────────┼──────────────┼───────────────┤
+│ TODO        │ Task         │ Task         │ Task          │
+│             │ Task         │ + Add task   │ Task          │
+├─────────────┼──────────────┼──────────────┼───────────────┤
+│ DOING       │ Task         │ Task         │               │
+│             │ Task         │              │               │
+├─────────────┼──────────────┼──────────────┼───────────────┤
+│ DONE        │ Task         │              │ Task          │
+└─────────────┴──────────────┴──────────────┴───────────────┘
+```
+
+The board should be horizontally scrollable if there are many columns.
+
+Rows should remain visually understandable while scrolling.
+
+Columns should maintain consistent widths.
+
+---
+
+# 15. Task Card
+
+Task cards must be compact.
+
+Only show:
+
+```text
+Task title
+Deadline
+Short doer identifier
+```
+
+Example:
+
+```text
+Implement JWT authentication
+
+Tomorrow · AG
+```
+
+Do not show description in the board card.
+
+Do not make cards unnecessarily large.
+
+Cards should have subtle borders and hover states.
+
+Use visual hierarchy instead of excessive decoration.
+
+For missing deadline:
+
+```text
+Implement JWT authentication
+
+AG
+```
+
+For missing doer:
+
+```text
+Implement JWT authentication
+
+Tomorrow
+```
+
+For neither:
+
+```text
+Implement JWT authentication
+```
+
+---
+
+# 16. Quick Task Creation
+
+This is one of the most important UX features.
+
+Inside the TODO cell of every column, provide:
+
+```text
++ Add task
+```
+
+Clicking it should NOT open a huge form.
+
+Instead, immediately provide a compact input:
+
+```text
+┌─────────────────────────────┐
+│ New task...                 │
+└─────────────────────────────┘
+```
+
+The user should be able to type:
+
+```text
+Implement login API
+```
+
+and press Enter.
+
+The task should immediately be created in:
+
+```text
+status = first/default board status
+column = current column
+```
+
+Only title is required.
+
+After creation:
+
+* optimistically show the task
+* allow clicking it to edit details
+
+The user should not be forced to fill description, doer, or deadline during creation.
+
+This should make creating many tasks extremely fast.
+
+---
+
+# 17. Task Modal
+
+Clicking a task opens a polished modal or side panel.
+
+Do not navigate away from the board.
+
+The modal should show and allow editing:
+
+```text
+Title
+Description
+Doer
+Deadline
+Status
+Column
+```
+
+Also show useful metadata:
+
+```text
+Created
+Last updated
+```
+
+Example layout:
+
+```text
+┌───────────────────────────────────────────────┐
+│ Edit Task                                ×    │
+│                                               │
+│ Title                                         │
+│ ┌───────────────────────────────────────────┐ │
+│ │ Implement authentication                  │ │
+│ └───────────────────────────────────────────┘ │
+│                                               │
+│ Description                                   │
+│ ┌───────────────────────────────────────────┐ │
+│ │ ...                                       │ │
+│ └───────────────────────────────────────────┘ │
+│                                               │
+│ Assignee       Status          Category       │
+│ [ Alireza ]    [ DOING ]       [ Backend ]   │
+│                                               │
+│ Deadline                                       │
+│ [ 2026-08-20 ]                                │
+│                                               │
+│                         Delete   Save Changes │
+└───────────────────────────────────────────────┘
+```
+
+Use proper form validation.
+
+Support keyboard-friendly interaction.
+
+Escape should close the modal.
+
+Clicking outside can close it if there are no unsaved changes.
+
+If there are unsaved changes, prevent accidental data loss.
+
+---
+
+# 18. My Tasks Filter
+
+The board header must contain a filter:
+
+```text
+☐ My tasks
+```
+
+When enabled:
+
+Only tasks where:
+
+```text
+task.doer == current_user
+```
+
+should be displayed.
+
+Important:
+
+The filter should NOT remove empty cells.
+
+The board structure remains identical.
+
+Only task cards are filtered.
+
+This makes it easy for a user to understand their workload without losing the context of the board.
+
+---
+
+# 19. Search
+
+Add a lightweight task search field in the board header.
+
+Search should filter tasks by title.
+
+If practical, also search description.
+
+The search should work together with the "My tasks" filter.
+
+Example:
+
+```text
+Search tasks...
+```
+
+Do not make search dominate the UI.
+
+---
+
+# 20. Drag and Drop
+
+Use `dnd-kit`.
+
+Support:
+
+### Reordering
+
+Dragging:
+
+```text
+Task A
+Task B
+Task C
+```
+
+to:
+
+```text
+Task B
+Task A
+Task C
+```
+
+must persist the new priority.
+
+### Moving between cells
+
+Dragging a task from:
+
+```text
+Backend / TODO
+```
+
+to:
+
+```text
+Frontend / DOING
+```
+
+must update both:
+
+```text
+column
+status
+```
+
+and its position.
+
+Use optimistic UI where practical.
+
+If the API request fails:
+
+* restore the previous position
+* show a non-intrusive error notification
+
+Dragging should feel extremely smooth.
+
+Use subtle animation.
+
+Do not make the entire board jump around during drag operations.
+
+---
+
+# 21. Design System
+
+The UI should be:
+
+* dark
+* minimal
+* modern
+* professional
+* dense but readable
+* fast
+* calm
+
+Think:
+
+* Linear
+* modern Jira
+* refined Trello
+* Raycast
+* modern developer tools
+
+Do NOT copy any product's visual identity.
+
+Create an original design.
+
+---
+
+# 22. Glass / Blur Effects
+
+Use subtle glass effects.
+
+For example:
+
+```css
+background: rgba(...)
+backdrop-filter: blur(...)
+border: 1px solid rgba(...)
+```
+
+Use blur primarily for:
+
+* board header
+* modal
+* floating controls
+* overlays
+
+Do not apply heavy blur to every task card.
+
+The board must remain readable.
+
+Avoid excessive gradients.
+
+---
+
+# 23. Colors
+
+Use a very dark neutral base.
+
+Example conceptual palette:
+
+```text
+Background: near-black charcoal
+Surface: slightly lighter charcoal
+Border: subtle white/gray transparency
+Text: soft white
+Secondary text: muted gray
+Accent: restrained blue/purple
+Success: muted green
+Warning: muted amber
+Danger: muted red
+```
+
+Do not use saturated rainbow colors.
+
+Status colors should be subtle.
+
+---
+
+# 24. Responsive Behavior
+
+Desktop is the primary target because this is a board application.
+
+However, the application should remain usable on smaller screens.
+
+On mobile:
+
+* board becomes horizontally scrollable
+* columns remain readable
+* task cards remain compact
+* task editing modal becomes a full-screen sheet
+* board header controls should remain accessible
+
+Do not attempt to squeeze all columns into the mobile viewport.
+
+Horizontal scrolling is acceptable and preferable.
+
+---
+
+# 25. Loading States
+
+Do not show blank screens while loading.
+
+Use:
+
+* skeleton loaders
+* subtle placeholders
+* optimistic updates where appropriate
+
+The board should feel responsive even on slower networks.
+
+---
+
+# 26. Error Handling
+
+Implement friendly error states.
+
+Examples:
+
+```text
+Unable to load this board.
+Try again
+```
+
+For mutations:
+
+```text
+Couldn't save changes.
+Please try again.
+```
+
+Do not expose raw Django error responses to users.
+
+Log useful technical errors appropriately.
+
+---
+
+# 27. Notifications
+
+Use lightweight toast notifications.
+
+Examples:
+
+```text
+Task created
+Task updated
+Task moved
+Changes saved
+Couldn't save changes
+```
+
+Do not overuse notifications.
+
+---
+
+# 28. Authentication
+
+Inspect the existing project first.
+
+If authentication already exists, reuse it.
+
+If not, implement a clean authentication mechanism compatible with Django REST Framework and Next.js.
+
+The frontend must know:
+
+* current authenticated user
+* user's boards
+* board membership
+
+Protect application routes.
+
+Unauthenticated users should not be able to access board data.
+
+---
+
+# 29. Frontend API Layer
+
+Do not scatter raw fetch calls throughout React components.
+
+Create a clean API layer.
+
+For example:
+
+```text
+lib/api/
+  auth.ts
+  boards.ts
+  tasks.ts
+```
+
+Create typed API responses.
+
+Create reusable hooks such as:
+
+```text
+useBoards()
+useBoard()
+useTasks()
+useUpdateTask()
+useMoveTask()
+useCreateTask()
+```
+
+Use TanStack Query.
+
+---
+
+# 30. Type Safety
+
+Avoid:
+
+```typescript
+any
+```
+
+unless absolutely unavoidable.
+
+Define shared frontend types for:
+
+```typescript
+User
+Board
+BoardMember
+BoardColumn
+BoardStatus
+Task
+```
+
+Make API responses strongly typed.
+
+Use Zod for client-side validation where useful.
+
+---
+
+# 31. Performance
+
+The board may eventually contain hundreds or thousands of tasks.
+
+Design for this from the beginning.
+
+Backend:
+
+* avoid N+1 queries
+* add indexes where appropriate
+* use select_related/prefetch_related
+* paginate where appropriate for non-board endpoints
+
+Frontend:
+
+* avoid unnecessary rerenders
+* memoize expensive board/task components where useful
+* keep drag state isolated
+* do not duplicate entire board state unnecessarily
+* use stable React keys
+
+Do not prematurely introduce virtualization unless it is actually needed.
+
+---
+
+# 32. Database Constraints and Indexes
+
+Add appropriate database constraints.
+
+At minimum:
+
+```text
+BoardMember(board, user) unique
+
+Task board/column/status consistency
+```
+
+Add indexes for common access patterns such as:
+
+```text
+Task(board, status, column, position)
+BoardMember(board, user)
+```
+
+Use Django migrations.
+
+Never manually manipulate the database schema outside migrations.
+
+---
+
+# 33. API Validation
+
+Backend validation must enforce:
+
+* title is not empty
+* task belongs to board
+* column belongs to board
+* status belongs to board
+* doer belongs to board
+* user has access to board
+
+Never rely exclusively on frontend validation.
+
+---
+
+# 34. Board Initialization
+
+Create a convenient way to create a board with default statuses.
+
+A new board should automatically receive:
+
+```text
+TODO
+DOING
+DONE
+```
+
+in that order.
+
+The implementation may use:
+
+* Django signal
+* service function
+* admin logic
+
+Prefer an explicit service/domain function over hiding important business logic in signals if that makes the architecture clearer.
+
+---
+
+# 35. Empty States
+
+Design beautiful empty states.
+
+If a cell has no tasks:
+
+```text
+No tasks
+```
+
+should NOT be displayed repeatedly.
+
+Prefer an almost empty cell with:
+
+```text
++ Add task
+```
+
+available in TODO cells.
+
+For non-TODO cells, the empty area should remain clean and visually quiet.
+
+---
+
+# 36. Board Header
+
+The header should include:
+
+```text
+Board name
+
+Members
+
+Search
+
+☐ My tasks
+
+Optional board menu
+```
+
+Member avatars should be compact.
+
+Hovering an avatar should show the user's name.
+
+If there are many members:
+
+```text
++4
+```
+
+should appear after the first few avatars.
+
+---
+
+# 37. Board Navigation
+
+Create a simple application shell.
+
+Potential structure:
+
+```text
+┌──────────────────────────────────────────────────────┐
+│ Logo        Boards                         User      │
+├─────────────┬────────────────────────────────────────┤
+│             │                                        │
+│ My Boards   │              Current Board             │
+│             │                                        │
+│ Board A     │                                        │
+│ Board B     │                                        │
+│ Board C     │                                        │
+│             │                                        │
+└─────────────┴────────────────────────────────────────┘
+```
+
+Keep the sidebar minimal.
+
+The important thing is the board, not the navigation.
+
+---
+
+# 38. Boards Page
+
+Create a board list/dashboard.
+
+Display boards the current user belongs to.
+
+Each board card should show:
+
+* name
+* description if available
+* member count
+* task count if efficiently available
+
+Clicking a board opens:
+
+```text
+/boards/:id
+```
+
+The board list should feel like a modern SaaS application, not Django Admin.
+
+---
+
+# 39. Accessibility
+
+Implement good accessibility.
+
+Requirements:
+
+* keyboard navigation where practical
+* visible focus states
+* semantic buttons
+* accessible dialogs
+* labels for form controls
+* sufficient contrast
+* don't rely only on color
+* drag-and-drop should have reasonable keyboard accessibility if supported by dnd-kit
+
+---
+
+# 40. Security
+
+Follow Django and DRF security best practices.
+
+Do not:
+
+* expose unnecessary user information
+* trust board IDs from the frontend
+* trust user IDs for task assignment
+* allow unauthorized task movement
+* allow cross-board references
+
+Ensure CSRF/authentication behavior is correct for the chosen authentication mechanism.
+
+Never place secrets in frontend environment variables.
+
+Only expose variables prefixed with `NEXT_PUBLIC_` if they are genuinely safe for browsers.
+
+---
+
+# 41. UX Details That Matter
+
+Pay special attention to these interactions.
+
+## Creating a task
+
+User clicks:
+
+```text
++ Add task
+```
+
+Types:
+
+```text
+Fix checkout API
+```
+
+Presses Enter.
+
+Task appears immediately.
+
+No modal.
+
+No required extra fields.
+
+---
+
+## Editing a task
+
+User clicks:
+
+```text
+Fix checkout API
+```
+
+Modal opens.
+
+They can modify:
+
+```text
+description
+doer
+deadline
+status
+column
+title
+```
+
+Save.
+
+Modal closes.
+
+Board updates immediately.
+
+---
+
+## Moving a task
+
+User drags task.
+
+The destination cell clearly highlights.
+
+On drop:
+
+* task moves visually
+* API request is sent
+* server persists position
+* UI stays responsive
+
+---
+
+# 42. Do Not Overengineer
+
+This is an MVP/product foundation.
+
+Do NOT implement unless necessary:
+
+* comments
+* attachments
+* subtasks
+* labels
+* time tracking
+* notifications system
+* activity feed
+* automation
+* recurring tasks
+* dependencies
+* complex permissions/roles
+* custom workflows UI
+
+Design the architecture so these can be added later, but don't build them now.
+
+---
+
+# 43. Suggested Future-Proofing
+
+Although these features are not required now, avoid architectural decisions that would make them difficult later.
+
+Potential future features:
+
+```text
+Comments
+Attachments
+Labels
+Subtasks
+Task dependencies
+Activity history
+Board roles
+Notifications
+Due-date reminders
+Task templates
+Automation
+```
+
+Keep the core models clean enough to support them later.
+
+---
+
+# 44. Testing
+
+Implement meaningful tests.
+
+Backend tests should cover:
+
+### Authentication
+
+* unauthenticated user cannot access boards
+
+### Board permissions
+
+* member can access board
+* non-member cannot access board
+
+### Task creation
+
+* member can create task
+* non-member cannot create task
+* title required
+* invalid column rejected
+* invalid status rejected
+* non-member doer rejected
+
+### Task update
+
+* member can update
+* invalid relationships rejected
+
+### Task movement
+
+* member can move
+* non-member cannot move
+* cross-board column rejected
+* cross-board status rejected
+* position is persisted
+
+### Ordering
+
+Test:
+
+* move within same cell
+* move to another cell
+* move to beginning
+* move to end
+* move between two tasks
+
+Frontend tests should cover important interactions where practical.
+
+---
+
+# 45. Seed / Development Data
+
+Create a development seed mechanism.
+
+Create:
+
+```text
+2-3 users
+2 boards
+multiple board members
+multiple columns
+multiple statuses
+20-30 tasks
+```
+
+Tasks should have different combinations of:
+
+* deadline
+* doer
+* description
+* status
+* category
+
+This should make the board visually useful immediately during development.
+
+Do not use real personal data.
+
+---
+
+# 46. Environment Configuration
+
+Use environment variables.
+
+Frontend should have something equivalent to:
+
+```text
+NEXT_PUBLIC_API_BASE_URL
+```
+
+Backend should use environment variables for:
+
+```text
+DATABASE_URL
+SECRET_KEY
+DEBUG
+ALLOWED_HOSTS
+CORS settings
+```
+
+Do not commit secrets.
+
+If Docker is already part of the project, preserve the existing Docker conventions.
+
+---
+
+# 47. Docker
+
+If the repository already uses Docker Compose, integrate with it instead of replacing the architecture.
+
+The expected production-style architecture may eventually be:
+
+```text
+Nginx
+  │
+  ├── Next.js
+  │
+  └── Django
+        │
+        └── PostgreSQL
+```
+
+If Redis/Celery already exists in the repository, don't remove it simply because this MVP doesn't need it.
+
+Use the existing conventions.
+
+For the Next.js production build, prefer a standalone build if that is already the project's convention.
+
+---
+
+# 48. UI Component Architecture
+
+Create reusable components.
+
+Suggested components:
+
+```text
+AppShell
+Sidebar
+BoardHeader
+Board
+BoardColumn
+BoardRow
+TaskCell
+TaskCard
+AddTaskInput
+TaskModal
+TaskForm
+MemberAvatars
+MyTasksFilter
+TaskSearch
+EmptyCell
+LoadingBoard
+```
+
+Do not put the entire application into one enormous component.
+
+Keep components focused.
+
+---
+
+# 49. Drag-and-Drop Architecture
+
+Design the board around:
+
+```text
+DndContext
+  └── Board
+       ├── StatusRow
+       │    ├── TaskCell
+       │    │    ├── SortableTask
+       │    │    ├── SortableTask
+       │    │    └── ...
+```
+
+Each task should have a stable draggable ID.
+
+Each cell should have a stable droppable ID.
+
+Avoid DOM-index-based identifiers.
+
+When a drag begins:
+
+* record the original location
+* visually elevate the dragged task
+* display a DragOverlay
+
+When dropped:
+
+* determine destination cell
+* calculate ordering
+* optimistically update UI
+* call backend
+* rollback if necessary
+
+---
+
+# 50. Modal Behavior
+
+Use a proper accessible dialog component.
+
+Task editing should support:
+
+* Escape to close
+* autofocus title when appropriate
+* keyboard navigation
+* loading state during save
+* disabled save button while saving
+* unsaved-change protection
+* delete confirmation
+
+Deletion should require confirmation.
+
+Example:
+
+```text
+Delete task?
+
+This cannot be undone.
+
+Cancel     Delete
+```
+
+---
+
+# 51. Visual Polish
+
+Spend significant effort on visual polish.
+
+The application should NOT look like a default Tailwind/shadcn demo.
+
+Use:
+
+* consistent spacing
+* subtle shadows
+* subtle borders
+* polished hover states
+* tasteful animations
+* smooth modal transitions
+* smooth drag transitions
+* carefully chosen typography
+* compact controls
+
+Avoid:
+
+* giant headings
+* excessive rounded cards
+* excessive shadows
+* excessive gradients
+* excessive glass effects
+* unnecessary decorative illustrations
+
+The product should feel like professional software used every day.
+
+---
+
+# 52. Desktop Board Interaction
+
+The board should occupy almost the entire available viewport.
+
+Avoid unnecessary page scrolling.
+
+Prefer:
+
+```text
+App shell
+    ↓
+Board header
+    ↓
+Scrollable board viewport
+```
+
+The board viewport should support:
+
+* horizontal scrolling for columns
+* vertical scrolling for tasks
+* clear separation between header and board content
+
+Consider sticky status labels/row headers if it improves usability.
+
+---
+
+# 53. Important Product Principle
+
+Optimize for this workflow:
+
+```text
+Open board
+    ↓
+See everything
+    ↓
+Quickly create task
+    ↓
+Drag task as work progresses
+    ↓
+Click task when details are needed
+```
+
+A user should be able to manage their day without constantly opening dialogs.
+
+The board itself should be the primary interface.
+
+---
+
+# 54. Implementation Process
+
+Do not attempt to generate the entire application blindly in one pass.
+
+Work incrementally.
+
+## Phase 1
+
+Inspect repository and architecture.
+
+Report:
+
+* existing frontend
+* existing backend
+* existing authentication
+* existing database
+* existing Docker setup
+* relevant dependencies
+
+Then propose the implementation plan.
+
+## Phase 2
+
+Implement Django models and migrations.
+
+## Phase 3
+
+Implement Django Admin.
+
+## Phase 4
+
+Implement API and permissions.
+
+## Phase 5
+
+Write backend tests.
+
+## Phase 6
+
+Implement Next.js application shell.
+
+## Phase 7
+
+Implement board list.
+
+## Phase 8
+
+Implement board UI.
+
+## Phase 9
+
+Implement task creation/editing.
+
+## Phase 10
+
+Implement drag-and-drop.
+
+## Phase 11
+
+Implement filtering/search.
+
+## Phase 12
+
+Polish UI/UX.
+
+## Phase 13
+
+Run tests and production build.
+
+---
+
+# 55. Development Rules
+
+Before modifying files:
+
+* inspect them first
+* understand existing conventions
+* make the smallest reasonable architectural changes
+
+Do not:
+
+* rewrite unrelated code
+* introduce dependencies without justification
+* duplicate functionality
+* create unnecessary abstractions
+* leave TODO placeholders for core functionality
+
+After each meaningful phase:
+
+1. run relevant tests
+2. run TypeScript checks
+3. run linting
+4. fix errors
+5. continue
+
+At the end:
+
+* run backend tests
+* run frontend lint
+* run TypeScript check
+* run production build
+* verify migrations
+* verify API permissions
+
+---
+
+# 56. Final Acceptance Criteria
+
+The implementation is complete only when all of these work:
+
+* [ ] User authentication works
+* [ ] User can see only boards they belong to
+* [ ] Django Admin can manage board membership
+* [ ] Boards can have custom columns
+* [ ] Boards can have custom statuses
+* [ ] New boards get TODO / DOING / DONE by default
+* [ ] Tasks require only a title
+* [ ] Tasks can optionally have description
+* [ ] Tasks can optionally have doer
+* [ ] Tasks can optionally have deadline
+* [ ] Tasks display compactly on the board
+* [ ] Tasks can be created directly inside TODO cells
+* [ ] Clicking a task opens an edit modal
+* [ ] Task fields can be edited
+* [ ] Tasks can be deleted
+* [ ] Tasks can be reordered within a cell
+* [ ] Tasks can move between cells
+* [ ] Moving tasks persists their order
+* [ ] My Tasks filter works
+* [ ] Search works
+* [ ] Backend enforces all permissions
+* [ ] Invalid cross-board relationships are rejected
+* [ ] UI has proper loading states
+* [ ] UI has proper error states
+* [ ] UI is responsive
+* [ ] UI is dark and minimal
+* [ ] UI uses subtle glass/blur effects
+* [ ] UI feels polished and professional
+* [ ] Backend tests pass
+* [ ] Frontend type checking passes
+* [ ] Frontend linting passes
+* [ ] Production build succeeds
+
+---
+
+# 57. Most Important Instruction
+
+Do not optimize for simply "getting the code working."
+
+Optimize for:
+
+1. Excellent board UX
+2. Extremely fast task creation
+3. Smooth drag-and-drop
+4. Strong backend data integrity
+5. Correct permissions
+6. Maintainable architecture
+7. Visual polish
+8. Performance
+
+The application should feel like a real product, not a coding exercise.
+
+When making design decisions not explicitly specified above, choose the solution that results in the simplest, fastest, most intuitive experience for a user managing dozens of tasks every day.
+
