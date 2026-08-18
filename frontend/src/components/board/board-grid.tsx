@@ -30,12 +30,19 @@ export function BoardGrid({
   onOpenTask: (task: Task) => void;
 }) {
   const templateColumns = `9rem repeat(${columns.length}, minmax(272px, 1fr))`;
+  // Header row + one auto row per status + a trailing 1fr filler row that
+  // absorbs any leftover height so the sticky status rail spans the full
+  // viewport instead of stopping at the last row.
+  const templateRows = `auto repeat(${statuses.length}, auto) 1fr`;
 
   return (
     <div className="min-h-0 flex-1 overflow-auto">
       <div
-        className="grid min-w-max pb-8 pr-4"
-        style={{ gridTemplateColumns: templateColumns }}
+        className="grid min-h-full min-w-max pr-4"
+        style={{
+          gridTemplateColumns: templateColumns,
+          gridTemplateRows: templateRows,
+        }}
       >
         {/* Header row */}
         <div className="sticky left-0 top-0 z-30 border-b border-r border-line bg-bg" />
@@ -61,6 +68,10 @@ export function BoardGrid({
             onOpenTask={onOpenTask}
           />
         ))}
+
+        {/* Filler cell in the 1fr row: continues the rail's background and
+            right divider down to the bottom of the scroll viewport. */}
+        <div className="sticky left-0 z-10 border-r border-line bg-bg" />
       </div>
     </div>
   );
