@@ -23,7 +23,7 @@ COPY . .
 
 # Run as a non-root user.
 RUN useradd --create-home --uid 1000 appuser \
-    && mkdir -p /app/staticfiles /app/data \
+    && mkdir -p /app/staticfiles /app/data /app/media \
     && chown -R appuser:appuser /app
 USER appuser
 

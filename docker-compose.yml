@@ -7,7 +7,9 @@ services:
     env_file: ./backend/.env
     volumes:
       - backend-data:/app/data
-      - backend-static:/app/staticfiles
+      # Bind-mounted to the host so the host nginx can serve them directly.
+      - ./backend/staticfiles:/app/staticfiles
+      - ./backend/media:/app/media
     ports:
       # Host 8010 -> container 8000 (host :8000 is used by another project).
       - "8010:8000"
@@ -32,4 +34,3 @@ services:
 
 volumes:
   backend-data:
-  backend-static:

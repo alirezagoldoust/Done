@@ -5,6 +5,9 @@ __pycache__/
 *.sqlite3
 backend/.env
 backend/staticfiles/
+backend/media/
+/.env
+frontend/.env
 
 # Node / Next.js
 frontend/node_modules/
