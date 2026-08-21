@@ -24,6 +24,20 @@ export interface BoardStatus {
   id: number;
   name: string;
   position: number;
+  is_collapsible: boolean;
+  collapsed: boolean;
+}
+
+export interface CreateStatusInput {
+  name: string;
+  is_collapsible?: boolean;
+}
+
+export interface UpdateStatusInput {
+  name?: string;
+  is_collapsible?: boolean;
+  collapsed?: boolean;
+  position?: number;
 }
 
 export type TaskColor = "default" | "purple" | "blue" | "teal" | "red";

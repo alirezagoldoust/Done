@@ -23,7 +23,33 @@ class BoardColumnSerializer(serializers.ModelSerializer):
 class BoardStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = BoardStatus
-        fields = ["id", "name", "position"]
+        fields = ["id", "name", "position", "is_collapsible", "collapsed"]
+
+
+class BoardStatusWriteSerializer(serializers.ModelSerializer):
+    """Create/update payload for a status row.
+
+    ``name`` and ``is_collapsible`` are settable on create; ``collapsed`` and
+    ``position`` (reorder) are settable on update. Positioning on create is
+    handled by the service, so ``position`` stays read-only there.
+    """
+
+    class Meta:
+        model = BoardStatus
+        fields = ["id", "name", "position", "is_collapsible", "collapsed"]
+        read_only_fields = ["id"]
+        extra_kwargs = {
+            "name": {"required": False},
+            "position": {"required": False},
+            "is_collapsible": {"required": False},
+            "collapsed": {"required": False},
+        }
+
+    def validate_name(self, value: str) -> str:
+        clean = (value or "").strip()
+        if not clean:
+            raise serializers.ValidationError("Status name cannot be empty.")
+        return clean
 
 
 class BoardListSerializer(serializers.ModelSerializer):

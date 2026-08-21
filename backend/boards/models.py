@@ -69,13 +69,21 @@ class BoardColumn(models.Model):
 
 
 class BoardStatus(models.Model):
-    """A workflow state within a board (e.g. TODO, DOING, DONE)."""
+    """A workflow state within a board (e.g. TODO, DOING, DONE).
+
+    A status may be marked ``is_collapsible`` to act as an archive-like row
+    (e.g. "Passed Sprint") that members manually drag done tasks into. Its
+    ``collapsed`` state is persisted board-wide so collapsing the row hides
+    that work for everyone, leaving the current sprint in focus.
+    """
 
     board = models.ForeignKey(
         Board, related_name="statuses", on_delete=models.CASCADE
     )
     name = models.CharField(max_length=100)
     position = models.IntegerField(default=0)
+    is_collapsible = models.BooleanField(default=False)
+    collapsed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

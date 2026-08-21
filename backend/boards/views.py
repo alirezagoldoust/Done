@@ -1,13 +1,15 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Count, Prefetch
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from tasks.models import Task
 from tasks.serializers import TaskCreateSerializer, TaskSerializer
 from tasks.services import create_task
 
-from .models import Board, BoardMember
+from .models import Board, BoardMember, BoardStatus
 from .permissions import IsBoardMember, is_member
 from .serializers import (
     BoardColumnSerializer,
@@ -15,7 +17,9 @@ from .serializers import (
     BoardListSerializer,
     BoardMemberSerializer,
     BoardStatusSerializer,
+    BoardStatusWriteSerializer,
 )
+from .services import create_status, delete_status
 
 
 class BoardViewSet(
@@ -90,10 +94,31 @@ class BoardViewSet(
         board = self.get_object()
         return Response(BoardColumnSerializer(board.columns.all(), many=True).data)
 
-    @action(detail=True, methods=["get"])
+    @action(detail=True, methods=["get", "post"])
     def statuses(self, request, pk=None):
         board = self.get_object()
-        return Response(BoardStatusSerializer(board.statuses.all(), many=True).data)
+
+        if request.method == "GET":
+            return Response(
+                BoardStatusSerializer(board.statuses.all(), many=True).data
+            )
+
+        # POST — create a custom row (status).
+        serializer = BoardStatusWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            status_obj = create_status(
+                board,
+                name=data.get("name", ""),
+                is_collapsible=data.get("is_collapsible", False),
+            )
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.messages)
+        return Response(
+            BoardStatusSerializer(status_obj).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["get", "post"])
     def tasks(self, request, pk=None):
@@ -136,3 +161,37 @@ class BoardViewSet(
             TaskSerializer(task, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class BoardStatusViewSet(
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    """Update (rename / toggle collapsible / collapse / reorder) and delete
+    status rows on boards the user belongs to.
+
+    Creation happens through ``POST /api/boards/:id/statuses/``. Membership is
+    enforced at the queryset level so rows on other boards are unreachable.
+    """
+
+    permission_classes = [permissions.IsAuthenticated, IsBoardMember]
+
+    def get_serializer_class(self):
+        return BoardStatusWriteSerializer
+
+    def get_queryset(self):
+        return (
+            BoardStatus.objects.filter(board__members__user=self.request.user)
+            .select_related("board")
+            .distinct()
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        status_obj = self.get_object()
+        try:
+            delete_status(status_obj)
+        except DjangoValidationError as exc:
+            raise ValidationError(exc.messages)
+        return Response(status=status.HTTP_204_NO_CONTENT)

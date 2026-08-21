@@ -6,7 +6,9 @@ default seeding are explicit and reusable.
 
 from __future__ import annotations
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Max
 
 from .models import Board, BoardColumn, BoardMember, BoardStatus
 
@@ -47,6 +49,43 @@ def ensure_default_statuses(
         for index, name in enumerate(names, start=1)
     ]
     return created
+
+
+def next_status_position(board: Board) -> int:
+    """Position for a status appended to the end of a board's row list."""
+    current_max = board.statuses.aggregate(m=Max("position"))["m"]
+    if current_max is None:
+        return POSITION_GAP
+    return current_max + POSITION_GAP
+
+
+def create_status(
+    board: Board, *, name: str, is_collapsible: bool = False
+) -> BoardStatus:
+    """Create a custom status (row) appended to the end of the board."""
+    clean_name = (name or "").strip()
+    if not clean_name:
+        raise ValidationError("Status name cannot be empty.")
+    return BoardStatus.objects.create(
+        board=board,
+        name=clean_name,
+        is_collapsible=is_collapsible,
+        position=next_status_position(board),
+    )
+
+
+def delete_status(status: BoardStatus) -> None:
+    """Delete a status row.
+
+    Guarded: refuses to delete a row that still holds tasks, so archived
+    work is never destroyed by accident. Move or clear its tasks first.
+    """
+    if status.tasks.exists():
+        raise ValidationError(
+            "Cannot delete a row that still contains tasks. "
+            "Move or remove its tasks first."
+        )
+    status.delete()
 
 
 def add_member(board: Board, user) -> BoardMember:

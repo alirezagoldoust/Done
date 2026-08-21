@@ -19,6 +19,7 @@ import { AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useBoard } from "@/hooks/use-boards";
 import { useMoveTask } from "@/hooks/use-tasks";
+import { useUpdateStatus } from "@/hooks/use-statuses";
 import { positionBetween } from "@/lib/ordering";
 import { Button } from "@/components/ui/button";
 import type { BoardDetail, Task } from "@/types";
@@ -62,6 +63,7 @@ export function BoardView({ boardId }: { boardId: number }) {
 function LoadedBoard({ board }: { board: BoardDetail }) {
   const { user } = useAuth();
   const move = useMoveTask(board.id);
+  const updateStatus = useUpdateStatus(board.id);
 
   const [search, setSearch] = useState("");
   const [myTasks, setMyTasks] = useState(false);
@@ -238,8 +240,9 @@ function LoadedBoard({ board }: { board: BoardDetail }) {
       {!hasStructure ? (
         <div className="flex flex-1 items-center justify-center px-4 text-center">
           <p className="max-w-sm text-sm text-text-muted">
-            This board has no columns or statuses yet. Add some in Django Admin
-            to start creating tasks.
+            This board has no columns or rows yet. Add rows with the{" "}
+            <span className="text-text">Rows</span> button above; columns are
+            managed in Django Admin.
           </p>
         </div>
       ) : (
@@ -258,6 +261,12 @@ function LoadedBoard({ board }: { board: BoardDetail }) {
             tasksByCell={cells}
             firstStatusId={firstStatusId}
             onOpenTask={setSelectedTask}
+            onToggleCollapse={(s) =>
+              updateStatus.mutate({
+                id: s.id,
+                input: { collapsed: !s.collapsed },
+              })
+            }
           />
           <DragOverlay dropAnimation={null}>
             {activeTask ? (

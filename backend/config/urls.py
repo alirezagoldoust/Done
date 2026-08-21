@@ -6,12 +6,13 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
 )
 
-from boards.views import BoardViewSet
+from boards.views import BoardStatusViewSet, BoardViewSet
 from tasks.views import TaskViewSet
 from users.views import me
 
 router = DefaultRouter()
 router.register(r"boards", BoardViewSet, basename="board")
+router.register(r"statuses", BoardStatusViewSet, basename="status")
 router.register(r"tasks", TaskViewSet, basename="task")
 
 urlpatterns = [
