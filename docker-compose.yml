@@ -1,0 +1,35 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    image: task-manager-backend
+    # All backend settings live in backend/.env (git-ignored).
+    env_file: ./backend/.env
+    volumes:
+      - backend-data:/app/data
+      - backend-static:/app/staticfiles
+    ports:
+      # Host 8010 -> container 8000 (host :8000 is used by another project).
+      - "8010:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the client bundle at build time, so it must be the URL the
+        # browser uses to reach the backend — i.e. the published host port.
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8010}
+    image: task-manager-frontend
+    env_file: ./frontend/.env
+    environment:
+      NODE_ENV: production
+    ports:
+      - "3010:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  backend-data:
+  backend-static:
